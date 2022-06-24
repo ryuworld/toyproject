@@ -9,12 +9,14 @@ html{
 }
 
 #game{
+    display: none;
     width: 500px;
     height: 100vh;
     margin: 0 auto;
     background: url("../resource/images/starfield.png") center 0 / 512px repeat-y;
     animation: movingBg 3s linear infinite;
     position: relative;
+
 }
 
 @keyframes movingBg{
@@ -24,9 +26,9 @@ html{
 .start {
     width: 100%;
     height: 100vh;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: rgba(0, 0, 0, 0.3);
     display: block;
-
+    position: absolute;
 }
 
 .start>div {
