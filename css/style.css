@@ -58,5 +58,8 @@ html{
 .alien{
     display: none;
     position: absolute;
-
+}
+.bullet{
+    display: none;
+    position: absolute;
 }

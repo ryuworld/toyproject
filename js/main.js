@@ -5,32 +5,31 @@ const game = document.querySelector("#game");
 
 //Setting
 let left = 237; //기준점
-let bottom = 81;
-let move = 3; //이동거리
-let invader_max = 10;
+let speed = 3; //이동거리
 let invader = [];
 let keyCodeMap = [];
 let missiles = [];
-let xPos = 0;
-let yPos = 0;
 
 // --------------------------------------- function ---------------------------------------
-startBtn.addEventListener("click", start); // 클릭 후 한번만 실행되는건데 drawalien은 계속 생성된다 이유는?
-startBtn.addEventListener("initialize", initialize); //이거의 역할?
+startBtn.addEventListener("click", start);
+startBtn.addEventListener("initialize", initialize);
 
 function initialize() {
-  let browser_w = game.offsetWidth; // 플레이그라운드 너비
-  let browser_h = game.offsetHeight;
+  let playground_w = game.offsetWidth;
+  let playground_h = game.offsetHeight;
   let player = document.querySelector(".player");
+  let alien = document.querySelector(".alien");
   let bullet = document.querySelector(".bullet");
-  console.log(bullet.height)
-  let fream = {
+  let frame = {
     player,
-    scope_w: browser_w - player.width,
-    scope_h: browser_h - bullet.height,
-    bullet
+    alien,
+    bullet,
+    player_top: playground_h - 50 - player.width, // 플레이어 스타일을 못가져옴
+    scope_w: playground_w - player.width,
   };
-  window.requestAnimationFrame(update(fream)); // 최초 실행
+  setInterval(() => drawAlien(), 3000);
+  setInterval(() => drawBullet(frame), 200);
+  window.requestAnimationFrame(update(frame)); // 최초 실행
 }
 
 //첫 플레이 버튼
@@ -42,8 +41,8 @@ function start() {
     startText.style.display = "block";
   }
   drawPlayer();
+  drawAlien();
   drawBullet();
-  drawAlien(setInterval(drawAlien, 3000));
   let event = new CustomEvent("initialize");
   startBtn.dispatchEvent(event);
 }
@@ -51,52 +50,89 @@ function start() {
 //비행기 생성
 function drawPlayer() {
   const playerImg = new Image(40);
-  playerImg.src = "../resource/images/player.png";
+  playerImg.src = "./resource/images/player.png";
   playerImg.classList.add("player");
   game.appendChild(playerImg);
 }
 
 //외계인생성
 function drawAlien() {
-  let alienImg = new Image(20);
-  alienImg.src = "../resource/images/invader.png";
+  let alienImg = new Image(40);
+  alienImg.src = "./resource/images/invader.png";
   alienImg.classList.add("alien");
   game.appendChild(alienImg);
-  alienImg.style.display = "block"
+  alienImg.direction = Math.random() < 0.5 ? "left" : "right";
+  alienImg.style.display = "block";
   alienImg.style.left = `${Math.random() * game.offsetWidth}px`;
   alienImg.style.top = `${(Math.random() * game.offsetHeight) / 3}px`;
   invader.push(alienImg);
 }
 
-//총알
-function drawBullet() {
-  let bulletImg = new Image(6,10);
-  bulletImg.src = "../resource/images/bullet.png";
+//플레이어 미사일 생성
+function drawBullet(frame) {
+  let bulletImg = new Image(6, 10);
+  bulletImg.src = "./resource/images/bullet.png";
   bulletImg.classList.add("bullet");
   missiles.push(bulletImg);
   game.appendChild(bulletImg);
-  setInterval(drawBullet,1000)
+  if (keyCodeMap[90]) {
+    bulletImg.style.display = "block";
+    bulletImg.style.left = `${left}px`;
+    bulletImg.style.top = `${frame.player_top}px`;
+  }
 }
 
 function updateAlien(scope_w) {
   for (a of invader) {
-    if (`${parseInt(a.style.left)}` > 0) {
-      a.style.left = `${parseInt(a.style.left) + move}px`;
-      if (`${parseInt(a.style.left)}` > scope_w) {
-        cancelAnimationFrame(updateAlien);
-        a.style.left = `${parseInt(a.style.left) - move}px`;
-      }
+    if (a.direciton == "right") {
+      a.style.left = `${parseInt(a.style.left) + speed}px`;
+    } else {
+      a.style.left = `${parseInt(a.style.left) - speed}px`;
+    }
+    if (parseInt(a.style.left) >= scope_w) {
+      a.direciton = "left";
+    }
+    if (parseInt(a.style.left) <= 0) {
+      a.direciton = "right";
+      a.style.left = 0;
+    }
+    console.log(a.direciton);
+  }
+}
+
+function updateBullet() {
+  for (let bullet of missiles) {
+    let top = speedDelta(bullet, "top", -5);
+    if (top < -10) {
+      bullet.remove();
     }
   }
 }
 
-
-function update(fream) {
+function update(frame) {
   return () => {
-    onkey_press(fream.player, fream.scope_w,fream.scope_h,fream.bullet);
-    updateAlien(fream.scope_w);
-    window.requestAnimationFrame(update(fream));
-  }; //함수를 리턴하는 이유는 클로저때문! fream을 전역으로 두면 클로저를 안써도 괜찮다!
+    onkey_press(frame.player, frame.scope_w, frame.scope_h);
+    updateAlien(frame.scope_w);
+    updateBullet();
+    collision(frame.alien, frame.bullet);
+    window.requestAnimationFrame(update(frame));
+  };
+}
+//충돌감지
+function collision(alien, bullet) {
+  let alienLeft = speedDelta(alien, "left", 0);
+  let alienTop = speedDelta(alien, "top", 0);
+  let bulletLeft = speedDelta(bullet, "left", 0);
+  let bulletTop = speedDelta(bullet, "top", 0);
+  if (
+    alienLeft + alien.width >= bulletLeft &&
+    alienLeft <= bulletLeft + bullet.width &&
+    alienTop + alien.height >= bulletTop &&
+    alienTop <= bulletTop + bullet.height
+  ) {
+    alien.remove();
+    bullet.remove();
+  }
 }
 
 // 비행기 움직임
@@ -107,29 +143,23 @@ document.onkeyup = (e) => {
   keyCodeMap[e.keyCode] = false;
 };
 
-function onkey_press(player, scope_w, scope_h, bullet) {
+function speedDelta(element, attribute, delta) {
+  let value = parseInt(element.style[attribute]) + delta;
+  element.style[attribute] = `${value}px`;
+  return value;
+}
+
+function onkey_press(player, scope_w) {
   if (keyCodeMap[37]) {
-    left = left - move;
+    left = left - speed;
     if (left < 0) {
       left = 0;
     }
   } else if (keyCodeMap[39]) {
-    left = left + move;
+    left = left + speed;
     if (left > scope_w) {
       left = scope_w;
     }
   }
-  else if (keyCodeMap[90]) {
-    for (m of missiles) {
-      m.style.display = "block";
-      setInterval(() => {
-        bottom = bottom + move;
-        if (bottom > scope_h) {
-          m.style.display = "none";
-        }
-      })
-    }
-  }
   player.style.left = left + "px";
-  bullet.style.bottom = bottom + "px";
 }
